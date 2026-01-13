@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "260873658760",
+    "project_id": "fawad-pesticides",
+    "storage_bucket": "fawad-pesticides.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:260873658760:android:d7c212c4f7e6a962fe9a3d",
+        "android_client_info": {
+          "package_name": "com.example.crop_care_ptv_ltd"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAWxb-tmdrjkPsRi-2-gCLT1DX4HJveLB8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
