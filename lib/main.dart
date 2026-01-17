@@ -1,10 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crop_care_ptv_ltd/repositories/offline_queue_repository.dart';
 import 'package:crop_care_ptv_ltd/screens/dashboard/admin/admin_dashboard.dart';
 import 'package:crop_care_ptv_ltd/screens/dashboard/employee/employee_dashboard.dart';
-import 'package:crop_care_ptv_ltd/screens/start/pin_screen.dart';
-import 'package:crop_care_ptv_ltd/screens/start/start_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -15,8 +13,10 @@ import 'core/controllers/payment_controller.dart';
 import 'core/controllers/retailer_controller.dart';
 import 'core/controllers/retailers_summary_controller.dart';
 import 'core/controllers/sales_controller.dart';
+import 'core/services/auth_service.dart';
 import 'core/services/firestore_service.dart';
 import 'core/services/ledger_service.dart';
+import 'core/services/local_storage_service.dart';
 import 'core/services/outstanding_service.dart';
 import 'core/services/payment_service.dart';
 import 'core/services/retailers_service.dart';
@@ -24,6 +24,7 @@ import 'core/services/retailers_summary_service.dart';
 import 'core/services/sales_service.dart';
 import 'core/services/sync_service.dart';
 import 'firebase_options.dart';
+import 'screens/login_screen/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -144,7 +145,8 @@ void initializeServices() {
 
   Get.put(LedgerService());
   Get.put(LedgerController());
-
+  Get.put(LocalStorageService());
+  Get.put(AuthService());
   print('✅ All services initialized');
 }
 
@@ -157,7 +159,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       initialRoute: '/login',
       getPages: [
-        GetPage(name: '/login', page: () => const LoginScreen ()),
+        GetPage(name: '/login', page: () => const LoginScreen()),
         GetPage(name: '/admin-dashboard', page: () => const AdminDashboard()),
         GetPage(
           name: '/employee-dashboard',
