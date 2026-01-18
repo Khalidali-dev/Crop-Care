@@ -1,126 +1,102 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:get/get.dart';
+import 'dart:developer';
+
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/user_model.dart';
-import '../../repositories/auth_repository.dart';
-import 'local_storage_service.dart';
+import '../core/services/firestore_service.dart';
 
-class AuthService extends GetxService {
-  final AuthRepository _repo = AuthRepository();
-  final LocalStorageService _storage = Get.find();
+class AuthRepository {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirestoreService _firestore = FirestoreService();
 
-  final Rx<UserModel?> _currentUser = Rx<UserModel?>(null);
-  final RxBool _isAuthenticated = false.obs;
-  final RxBool _isOnline = true.obs;
-  final RxString _authError = ''.obs;
-
-  // ================= GETTERS =================
-  UserModel? get currentUser => _currentUser.value;
-  bool get isAuthenticated => _isAuthenticated.value;
-  bool get isOnline => _isOnline.value;
-  String get authError => _authError.value;
-
-  bool get isAdmin => _currentUser.value?.isAdmin ?? false;
-  bool get isEmployee => _currentUser.value?.isEmployee ?? false;
-
-  // ================= STREAM =================
-  Stream<List<UserModel>> get pendingEmployeesStream =>
-      _repo.pendingEmployeesStream();
-
-  // ================= INIT =================
-  Future<AuthService> initialize() async {
-    final connectivity = Connectivity();
-    final result = await connectivity.checkConnectivity();
-    _isOnline.value = !result.contains(ConnectivityResult.none);
-
-    connectivity.onConnectivityChanged.listen((results) {
-      _isOnline.value =
-          results.isNotEmpty && results.first != ConnectivityResult.none;
-    });
-
-    if (_storage.isUserLoggedIn()) {
-      _currentUser.value = UserModel(
-        id: _storage.getUserId()!,
-        name: _storage.getUserName()!,
-        email: _storage.getUserEmail()!,
-        role: _storage.getUserRole()!,
-      );
-      _isAuthenticated.value = true;
-    }
-
-    return this;
-  }
+  static const String _collection = 'users';
 
   // ================= LOGIN =================
-  Future<bool> login(String email, String password) async {
+  Future<UserModel?> login(String email, String password) async {
     try {
-      _authError.value = '';
-      final user = await _repo.login(email, password);
-
-      if (user == null) {
-        _authError.value = 'Invalid email or password';
-        return false;
-      }
-
-      if (user.isEmployee && !user.isApproved) {
-        _authError.value = 'Waiting for admin approval';
-        return false;
-      }
-
-      _currentUser.value = user;
-      _isAuthenticated.value = true;
-
-      await _storage.saveUserData(
-        userId: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
       );
 
-      return true;
+      final uid = credential.user!.uid;
+      log("Firebase Auth UID: $uid"); // Add this
+
+      return await getById(uid);
     } catch (e) {
-      _authError.value = e.toString();
-      return false;
+      log("Login error: $e");
+      return null;
     }
   }
 
   // ================= REGISTER =================
-  Future<bool> register({
+  Future<UserModel?> register({
     required String name,
     required String email,
     required String password,
     required String role,
   }) async {
+    final credential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    final user = UserModel(
+      id: credential.user!.uid,
+      name: name,
+      email: email,
+      role: role,
+      isApproved: role == 'admin',
+    );
+
+    await _firestore.setData(
+      collection: _collection,
+      docId: user.id,
+      data: user.toMap(),
+    );
+
+    return user;
+  }
+
+  // ================= GET USER =================
+  Future<UserModel?> getById(String uid) async {
     try {
-      _authError.value = '';
-      final user = await _repo.register(
-        name: name,
-        email: email,
-        password: password,
-        role: role,
-      );
+      final doc = await _firestore.getById(collection: _collection, docId: uid);
 
-      if (user == null) return false;
+      log("Firestore document exists: ${doc.exists}");
+      if (!doc.exists) return null;
 
-      _currentUser.value = user;
-      _isAuthenticated.value = true;
-      return true;
+      return UserModel.fromMap(doc.data()!);
     } catch (e) {
-      _authError.value = e.toString();
-      return false;
+      log("getById error: $e");
+      return null;
     }
   }
 
-  // ================= APPROVE =================
+  // ================= APPROVE EMPLOYEE =================
   Future<void> approveEmployee(String uid) async {
-    await _repo.approveEmployee(uid);
+    await _firestore.setData(
+      collection: _collection,
+      docId: uid,
+      data: {'isApproved': true},
+    );
+  }
+
+  // ================= PENDING EMPLOYEES =================
+  Stream<List<UserModel>> pendingEmployeesStream() {
+    return _firestore
+        .query(collection: _collection)
+        .where('role', isEqualTo: 'employee')
+        .where('isApproved', isEqualTo: false)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((d) => UserModel.fromMap(d.data())).toList(),
+        );
   }
 
   // ================= LOGOUT =================
   Future<void> logout() async {
-    await _repo.logout();
-    await _storage.clearUserData();
-    _currentUser.value = null;
-    _isAuthenticated.value = false;
+    await _auth.signOut();
   }
 }
